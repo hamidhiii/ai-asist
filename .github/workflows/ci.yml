@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ai_asist
+          POSTGRES_PASSWORD: ai_asist
+          POSTGRES_DB: ai_asist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_asist"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://ai_asist:ai_asist@localhost:5432/ai_asist
+      DJANGO_SECRET_KEY: ci-test-key
+      DJANGO_DEBUG: "1"
+      FIELD_ENCRYPTION_KEY: "zGx3n8P1s0aQeXY6mZ2r9tB4uJd7CkLw5NfVhOiTqM0="
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+
+      - name: Run tests
+        run: python manage.py test
+
+      - name: Django system check
+        run: python manage.py check

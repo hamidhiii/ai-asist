@@ -4,11 +4,14 @@ One-time consent per client; after that we refresh silently using the
 stored refresh_token. No password ever touches the bot or the database.
 """
 from django.conf import settings
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
 ]
 
 
@@ -45,3 +48,27 @@ def exchange_code(code: str, state: str) -> dict:
         "refresh_token": credentials.refresh_token,
         "expiry": credentials.expiry,
     }
+
+
+def get_credentials(account) -> Credentials:
+    """Build live Credentials for an EmailAccount, refreshing if needed.
+
+    Any refreshed access token/expiry is written back to the account so the
+    next call doesn't have to hit Google again.
+    """
+    credentials = Credentials(
+        token=account.access_token,
+        refresh_token=account.refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
+        client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
+        scopes=SCOPES,
+    )
+
+    if credentials.expired and credentials.refresh_token:
+        credentials.refresh(GoogleAuthRequest())
+        account.access_token = credentials.token
+        account.token_expiry = credentials.expiry
+        account.save(update_fields=["access_token", "token_expiry"])
+
+    return credentials

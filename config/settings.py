@@ -73,7 +73,7 @@ def _database_from_url(url: str) -> dict:
 
 DATABASES = {
     "default": _database_from_url(
-        os.environ.get("DATABASE_URL", "postgres://ai_asist:ai_asist@localhost:5432/ai_asist")
+        os.environ.get("DATABASE_URL", "postgres://ai_asist:ai_asist@localhost:5433/ai_asist")
     )
 }
 
@@ -90,6 +90,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -109,7 +110,28 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 TELEGRAM_WEBHOOK_URL = os.environ.get("TELEGRAM_WEBHOOK_URL", "")
 
+# --- Field-level encryption (Gmail tokens at rest) ---
+FIELD_ENCRYPTION_KEY = os.environ.get("FIELD_ENCRYPTION_KEY", "")
+
 # --- Google OAuth (Email agent) ---
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "")
+
+# --- Anthropic (LLM router) ---
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+
+# --- Celery beat schedule ---
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "send-due-reminders": {
+        "task": "apps.tasks_payments.tasks.send_due_reminders",
+        "schedule": crontab(minute=0, hour=9),
+    },
+    "flag-overdue-payments": {
+        "task": "apps.tasks_payments.tasks.flag_overdue_payments",
+        "schedule": crontab(minute=0, hour=9),
+    },
+}
