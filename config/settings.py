@@ -135,3 +135,27 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=0, hour=9),
     },
 }
+
+# --- Logging ---
+# With DEBUG=0, Django swallows unhandled 500s unless something is wired up to
+# receive them. `docker compose logs` reads stdout, so send everything there.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
