@@ -1,5 +1,6 @@
 import asyncio
 import json
+import tempfile
 
 from aiogram import Bot, types
 from django.conf import settings
@@ -14,12 +15,13 @@ from apps.orchestrator.models import Client
 from apps.orchestrator.router import route_message
 
 from .client import send_telegram_message
+from .transcription import transcribe
 
 
-async def _download_document(document: types.Document) -> bytes:
+async def _download_file(file_id: str) -> bytes:
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     try:
-        file = await bot.get_file(document.file_id)
+        file = await bot.get_file(file_id)
         buffer = await bot.download_file(file.file_path)
         return buffer.read()
     finally:
@@ -28,10 +30,24 @@ async def _download_document(document: types.Document) -> bytes:
 
 def _handle_document(telegram_user_id: int, document: types.Document) -> str:
     client, _ = Client.objects.get_or_create(telegram_user_id=telegram_user_id)
-    content = asyncio.run(_download_document(document))
+    content = asyncio.run(_download_file(document.file_id))
     upload = ExcelUpload.objects.create(client=client, original_name=document.file_name)
     upload.file.save(document.file_name, ContentFile(content))
     return analyze_upload(upload)
+
+
+def _handle_voice(telegram_user_id: int, voice: types.Voice) -> str:
+    content = asyncio.run(_download_file(voice.file_id))
+    with tempfile.NamedTemporaryFile(suffix=".oga") as tmp:
+        tmp.write(content)
+        tmp.flush()
+        text = transcribe(tmp.name)
+
+    if not text:
+        return "Не удалось разобрать голосовое сообщение. Попробуйте ещё раз или напишите текстом."
+
+    routed = route_message(telegram_user_id, text)
+    return f"Распознал: «{text}»\n\n{routed.reply}"
 
 
 @csrf_exempt
@@ -47,6 +63,11 @@ def webhook(request: HttpRequest) -> HttpResponse:
 
     if message.document is not None:
         reply = _handle_document(message.from_user.id, message.document)
+        send_telegram_message(message.chat.id, reply)
+        return HttpResponse(status=204)
+
+    if message.voice is not None:
+        reply = _handle_voice(message.from_user.id, message.voice)
         send_telegram_message(message.chat.id, reply)
         return HttpResponse(status=204)
 

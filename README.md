@@ -11,6 +11,10 @@
   отправка только после явного подтверждения клиентом. Токены хранятся в БД
   зашифрованными (Fernet).
 
+Голосовые сообщения в Telegram распознаются локально через `faster-whisper`
+(без внешнего API) и обрабатываются как обычный текст — бот отвечает и
+присылает, что именно распознал, чтобы клиент мог проверить/поправить.
+
 Маршрутизация сообщений между агентами выполняется Claude через tool use
 (`apps/orchestrator/router.py`).
 
@@ -53,6 +57,8 @@ Google API client (Gmail), Anthropic SDK.
 | `TELEGRAM_WEBHOOK_URL` | Публичный HTTPS-URL вебхука, напр. `https://your-domain.example/telegram/webhook/` |
 | `ANTHROPIC_API_KEY` | Ключ Anthropic API |
 | `ANTHROPIC_MODEL` | Модель роутера (по умолчанию `claude-sonnet-5`) |
+| `WHISPER_MODEL_SIZE` | Размер модели faster-whisper для распознавания голосовых (`tiny`/`base`/`small`/`medium`/`large-v3`; по умолчанию `small` — баланс скорости и качества на CPU) |
+| `WHISPER_LANGUAGE` | Код языка для распознавания (напр. `ru`); пусто — автоопределение на каждое сообщение (нужно для смешанной русской/узбекской аудитории) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Из Google Cloud Console (OAuth Consent Screen + Gmail API) |
 | `GOOGLE_OAUTH_REDIRECT_URI` | `https://your-domain.example/email/oauth/callback/`, должен совпадать с настройками в Google Cloud Console |
 
@@ -82,6 +88,15 @@ python manage.py test
 
 CI (`.github/workflows/ci.yml`) гоняет миграции, тесты и `manage.py check`
 на каждый push/PR в `main`.
+
+## Распознавание голоса
+
+Модель faster-whisper скачивается автоматически при первом голосовом сообщении
+(нужен доступ в интернет с сервера) и кэшируется в volume `whisper_cache`, чтобы
+не перекачивать её при каждом пересборке образа. Модель `small` — это около
+500 МБ и заметная нагрузка на CPU на первом запуске; если сервер слабый или
+голосовых будет много одновременно, переключитесь на `base` или `tiny` через
+`WHISPER_MODEL_SIZE`.
 
 ## Известные ограничения перед боевым запуском
 

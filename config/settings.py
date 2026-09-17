@@ -122,6 +122,12 @@ GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
+# --- Voice messages (local speech-to-text) ---
+# Model size trades accuracy for CPU time: tiny/base/small/medium/large-v3.
+WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
+# Empty = auto-detect language per message (handles mixed RU/UZ clients).
+WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "")
+
 # --- Celery beat schedule ---
 from celery.schedules import crontab  # noqa: E402
 
