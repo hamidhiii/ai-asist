@@ -125,7 +125,9 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 # --- Voice messages (local speech-to-text) ---
 # Model size trades accuracy for CPU time: tiny/base/small/medium/large-v3.
 WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
-# Empty = auto-detect language per message (handles mixed RU/UZ clients).
+# Empty = auto-pick between ru/uz per message (see transcription.py — clients
+# use both, and open-ended language auto-detect is unreliable on short
+# audio). Set to "ru" or "uz" to force one language for every message.
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "")
 
 # --- Celery beat schedule ---
