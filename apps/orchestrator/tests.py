@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import anthropic
 from django.test import TestCase
 
 from apps.orchestrator.router import route_message
@@ -78,3 +79,82 @@ class RouteMessageTests(TestCase):
 
         self.assertEqual(routed.agent_key, "orchestrator")
         self.assertEqual(routed.reply, "Просто ответ")
+
+
+def _block(block_type: str, **attrs):
+    block = MagicMock()
+    block.type = block_type
+    for key, value in attrs.items():
+        setattr(block, key, value)
+    return block
+
+
+def _response(blocks: list, stop_reason: str = "end_turn"):
+    response = MagicMock()
+    response.content = blocks
+    response.stop_reason = stop_reason
+    return response
+
+
+class WebSearchRoutingTests(TestCase):
+    @patch("apps.orchestrator.router.anthropic.Anthropic")
+    def test_answer_after_web_search_skips_narration(self, mock_anthropic_cls):
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = _response(
+            [
+                _block("text", text="Сейчас поищу."),
+                _block("server_tool_use"),
+                _block("web_search_tool_result"),
+                _block("text", text="Курс доллара — 12 700 сум."),
+            ]
+        )
+        mock_anthropic_cls.return_value = mock_client
+
+        routed = route_message(201, "Какой курс доллара?")
+
+        self.assertEqual(routed.agent_key, "orchestrator")
+        self.assertEqual(routed.reply, "Курс доллара — 12 700 сум.")
+        tools = mock_client.messages.create.call_args.kwargs["tools"]
+        self.assertTrue(any(t.get("name") == "web_search" for t in tools))
+
+    @patch("apps.orchestrator.router.anthropic.Anthropic")
+    def test_pause_turn_is_continued(self, mock_anthropic_cls):
+        paused = _response([_block("server_tool_use")], stop_reason="pause_turn")
+        done = _response([_block("text", text="Готово")])
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = [paused, done]
+        mock_anthropic_cls.return_value = mock_client
+
+        routed = route_message(202, "Что нового?")
+
+        self.assertEqual(routed.reply, "Готово")
+        self.assertEqual(mock_client.messages.create.call_count, 2)
+        second_messages = mock_client.messages.create.call_args.kwargs["messages"]
+        self.assertEqual(second_messages[-1]["role"], "assistant")
+
+    @patch("apps.orchestrator.router.anthropic.Anthropic")
+    def test_rejected_web_search_falls_back_to_agents_only(self, mock_anthropic_cls):
+        rejected = anthropic.BadRequestError(
+            "web search not enabled",
+            response=MagicMock(status_code=400),
+            body=None,
+        )
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = [rejected, _response([_block("text", text="Ок")])]
+        mock_anthropic_cls.return_value = mock_client
+
+        routed = route_message(203, "Привет")
+
+        self.assertEqual(routed.reply, "Ок")
+        retry_tools = mock_client.messages.create.call_args.kwargs["tools"]
+        self.assertFalse(any(t.get("name") == "web_search" for t in retry_tools))
+
+    @patch("apps.orchestrator.router.anthropic.Anthropic")
+    def test_long_reply_is_truncated_for_telegram(self, mock_anthropic_cls):
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = _response([_block("text", text="а" * 5000)])
+        mock_anthropic_cls.return_value = mock_client
+
+        routed = route_message(204, "Расскажи всё")
+
+        self.assertEqual(len(routed.reply), 4000)
