@@ -33,8 +33,6 @@ services:
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
-    volumes:
-      - whisper_cache:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,4 +70,3 @@ services:
 
 volumes:
   postgres_data:
-  whisper_cache:

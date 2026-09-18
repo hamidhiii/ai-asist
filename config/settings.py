@@ -122,12 +122,11 @@ GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
-# --- Voice messages (local speech-to-text) ---
-# Model size trades accuracy for CPU time: tiny/base/small/medium/large-v3.
-WHISPER_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
-# Empty = auto-pick between ru/uz per message (see transcription.py — clients
-# use both, and open-ended language auto-detect is unreliable on short
-# audio). Set to "ru" or "uz" to force one language for every message.
+# --- Voice messages (speech-to-text via Groq's hosted Whisper) ---
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_WHISPER_MODEL = os.environ.get("GROQ_WHISPER_MODEL", "whisper-large-v3")
+# Empty = auto-detect language per message (clients use both ru and uz).
+# Set to "ru" or "uz" to force one language for every voice message.
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "")
 
 # --- Celery beat schedule ---
