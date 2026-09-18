@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import tempfile
 
 from aiogram import Bot, types
@@ -16,6 +17,8 @@ from apps.orchestrator.router import route_message
 
 from .client import send_telegram_message
 from .transcription import transcribe
+
+logger = logging.getLogger(__name__)
 
 
 async def _download_file(file_id: str) -> bytes:
@@ -37,11 +40,15 @@ def _handle_document(telegram_user_id: int, document: types.Document) -> str:
 
 
 def _handle_voice(telegram_user_id: int, voice: types.Voice) -> str:
-    content = asyncio.run(_download_file(voice.file_id))
-    with tempfile.NamedTemporaryFile(suffix=".oga") as tmp:
-        tmp.write(content)
-        tmp.flush()
-        text = transcribe(tmp.name)
+    try:
+        content = asyncio.run(_download_file(voice.file_id))
+        with tempfile.NamedTemporaryFile(suffix=".ogg") as tmp:
+            tmp.write(content)
+            tmp.flush()
+            text = transcribe(tmp.name)
+    except Exception:
+        logger.exception("Voice message transcription failed")
+        return "Не удалось обработать голосовое сообщение. Попробуйте ещё раз или напишите текстом."
 
     if not text:
         return "Не удалось разобрать голосовое сообщение. Попробуйте ещё раз или напишите текстом."

@@ -69,6 +69,27 @@ class VoiceMessageWebhookTests(TestCase):
         mock_route.assert_not_called()
         mock_send.assert_called_once()
 
+    @patch("apps.telegram_bot.views._download_file", new_callable=AsyncMock)
+    @patch("apps.telegram_bot.views.route_message")
+    @patch("apps.telegram_bot.views.send_telegram_message")
+    @patch("apps.telegram_bot.views.transcribe")
+    def test_transcription_error_replies_instead_of_staying_silent(
+        self, mock_transcribe, mock_send, mock_route, mock_download
+    ):
+        mock_download.return_value = b"fake-ogg-bytes"
+        mock_transcribe.side_effect = RuntimeError("groq unavailable")
+
+        response = self.client.post(
+            "/telegram/webhook/",
+            data=json.dumps(_voice_update()),
+            content_type="application/json",
+            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="test-secret",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        mock_route.assert_not_called()
+        mock_send.assert_called_once()
+
     def test_missing_secret_header_is_forbidden(self):
         response = self.client.post(
             "/telegram/webhook/",
